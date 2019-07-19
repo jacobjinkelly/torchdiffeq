@@ -5,7 +5,7 @@ import time
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
 
@@ -178,18 +178,29 @@ def get_mnist_loaders(data_aug=False, batch_size=128, test_batch_size=1000, perc
         transforms.ToTensor(),
     ])
 
+    # MNIST: 60k TRAIN, 10k TEST
+    train_inds = np.arange(60000)
+    test_inds = np.arange(10000)
+    np.random.shuffle(train_inds)
+    np.random.shuffle(test_inds)
+    train_inds = train_inds[:6000]
+    test_inds = test_inds[:1000]
+
     train_loader = DataLoader(
-        datasets.MNIST(root='.data/mnist', train=True, download=True, transform=transform_train), batch_size=batch_size,
-        shuffle=True, num_workers=2, drop_last=True
+        Subset(datasets.MNIST(root='.data/mnist', train=True, download=True, transform=transform_train),
+               train_inds),
+        batch_size=batch_size, shuffle=True, num_workers=2, drop_last=True
     )
 
     train_eval_loader = DataLoader(
-        datasets.MNIST(root='.data/mnist', train=True, download=True, transform=transform_test),
+        Subset(datasets.MNIST(root='.data/mnist', train=True, download=True, transform=transform_test),
+               train_inds),
         batch_size=test_batch_size, shuffle=False, num_workers=2, drop_last=True
     )
 
     test_loader = DataLoader(
-        datasets.MNIST(root='.data/mnist', train=False, download=True, transform=transform_test),
+        Subset(datasets.MNIST(root='.data/mnist', train=False, download=True, transform=transform_test),
+               test_inds),
         batch_size=test_batch_size, shuffle=False, num_workers=2, drop_last=True
     )
 
@@ -362,7 +373,9 @@ if __name__ == '__main__':
 
         if itr % batches_per_epoch == 0:
             with torch.no_grad():
+                print("train acc")
                 train_acc = accuracy(model, train_eval_loader)
+                print("val acc")
                 val_acc = accuracy(model, test_loader)
                 if val_acc > best_acc:
                     torch.save({'state_dict': model.state_dict(), 'args': args}, os.path.join(args.save, 'model.pth'))
