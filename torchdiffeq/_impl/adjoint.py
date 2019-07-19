@@ -19,9 +19,20 @@ class OdeintAdjointMethod(torch.autograd.Function):
             fn_eval_count = [0]
             ans = odeint(func, y0, t, rtol=rtol, atol=atol, method=method, options=options,
                          step_count=step_count, fn_eval_count=fn_eval_count)
-            print("FORWARD\t\t"
-                  "Steps: {0:d}\t"
+            print("BATCHED FORWARD")
+            print("Steps: {0:d} "
                   "Fn Evals: {1:d}".format(step_count[0], fn_eval_count[0]))
+
+            print("SEPARATE FORWARD")
+            for i in range(y0[0].shape[0]):
+                step_count = [0]
+                fn_eval_count = [0]
+                odeint(func, (torch.unsqueeze(y0[0][i, ], 0), ),
+                       t, rtol=rtol, atol=atol, method=method, options=options,
+                       step_count=step_count, fn_eval_count=fn_eval_count)
+
+                print("Steps: {0:d} "
+                      "Fn Evals: {1:d}".format(step_count[0], fn_eval_count[0]))
         ctx.save_for_backward(t, flat_params, *ans)
         return ans
 
@@ -91,9 +102,23 @@ class OdeintAdjointMethod(torch.autograd.Function):
                     torch.tensor([t[i], t[i - 1]]), rtol=rtol, atol=atol, method=method, options=options,
                     step_count=step_count, fn_eval_count=fn_eval_count
                 )
-                print("BACKWARD\t"
-                      "Steps: {0:d}\t"
+                print("BATCHED BACKWARD")
+                print("Steps: {0:d} "
                       "Fn Evals: {1:d}".format(step_count[0], fn_eval_count[0]))
+
+                print("SEPARATE BACKWARD")
+                for j in range(ans_i[0].shape[0]):
+                    step_count = [0]
+                    fn_eval_count = [0]
+                    ans_i_el = (torch.unsqueeze(ans_i[0][j, ], 0), )
+                    adj_y_el = (torch.unsqueeze(adj_y[0][j, ], 0), )
+                    aug_y0_el = (*ans_i_el, *adj_y_el, adj_time, adj_params)
+                    odeint(augmented_dynamics, aug_y0_el,
+                           torch.tensor([t[i], t[i - 1]]), rtol=rtol, atol=atol, method=method, options=options,
+                           step_count=step_count, fn_eval_count=fn_eval_count
+                           )
+                    print("Steps: {0:d} "
+                          "Fn Evals: {1:d}".format(step_count[0], fn_eval_count[0]))
 
                 # Unpack aug_ans.
                 adj_y = aug_ans[n_tensors:2 * n_tensors]
