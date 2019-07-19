@@ -82,16 +82,16 @@ class Dopri5Solver(AdaptiveStepsizeODESolver):
             first_step = _convert_to_tensor(0.01, dtype=t.dtype, device=t.device)
         self.rk_state = _RungeKuttaState(self.y0, f0, t[0], t[0], first_step, interp_coeff=[self.y0] * 5)
 
-    def advance(self, next_t):
+    def advance(self, next_t, **kwargs):
         """Interpolate through the next time point, integrating as necessary."""
         n_steps = 0
         while next_t > self.rk_state.t1:
             assert n_steps < self.max_num_steps, 'max_num_steps exceeded ({}>={})'.format(n_steps, self.max_num_steps)
-            self.rk_state = self._adaptive_dopri5_step(self.rk_state)
+            self.rk_state = self._adaptive_dopri5_step(self.rk_state, **kwargs)
             n_steps += 1
         return _interp_evaluate(self.rk_state.interp_coeff, self.rk_state.t0, self.rk_state.t1, next_t)
 
-    def _adaptive_dopri5_step(self, rk_state):
+    def _adaptive_dopri5_step(self, rk_state, **kwargs):
         """Take an adaptive Runge-Kutta step to integrate the ODE."""
         y0, f0, _, t0, dt, interp_coeff = rk_state
         ########################################################
@@ -100,7 +100,7 @@ class Dopri5Solver(AdaptiveStepsizeODESolver):
         assert t0 + dt > t0, 'underflow in dt {}'.format(dt.item())
         for y0_ in y0:
             assert _is_finite(torch.abs(y0_)), 'non-finite values in state `y`: {}'.format(y0_)
-        y1, f1, y1_error, k = _runge_kutta_step(self.func, y0, f0, t0, dt, tableau=_DORMAND_PRINCE_SHAMPINE_TABLEAU)
+        y1, f1, y1_error, k = _runge_kutta_step(self.func, y0, f0, t0, dt, tableau=_DORMAND_PRINCE_SHAMPINE_TABLEAU, **kwargs)
 
         ########################################################
         #                     Error Ratio                      #

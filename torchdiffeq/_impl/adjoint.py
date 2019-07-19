@@ -7,7 +7,7 @@ from .misc import _flatten, _flatten_convert_none_to_zeros
 class OdeintAdjointMethod(torch.autograd.Function):
 
     @staticmethod
-    def forward(ctx, *args):
+    def forward(ctx, *args, **kwargs):
         assert len(args) >= 8, 'Internal error: all arguments required.'
         y0, func, t, flat_params, rtol, atol, method, options = \
             args[:-7], args[-7], args[-6], args[-5], args[-4], args[-3], args[-2], args[-1]
@@ -15,7 +15,13 @@ class OdeintAdjointMethod(torch.autograd.Function):
         ctx.func, ctx.rtol, ctx.atol, ctx.method, ctx.options = func, rtol, atol, method, options
 
         with torch.no_grad():
-            ans = odeint(func, y0, t, rtol=rtol, atol=atol, method=method, options=options)
+            step_count = [0]
+            fn_eval_count = [0]
+            ans = odeint(func, y0, t, rtol=rtol, atol=atol, method=method, options=options,
+                         step_count=step_count, fn_eval_count=fn_eval_count)
+            print("FORWARD\t\t"
+                  "Steps: {0:d}\t"
+                  "Fn Evals: {1:d}".format(step_count[0], fn_eval_count[0]))
         ctx.save_for_backward(t, flat_params, *ans)
         return ans
 
@@ -78,10 +84,16 @@ class OdeintAdjointMethod(torch.autograd.Function):
                 if adj_params.numel() == 0:
                     adj_params = torch.tensor(0.).to(adj_y[0])
                 aug_y0 = (*ans_i, *adj_y, adj_time, adj_params)
+                step_count = [0]
+                fn_eval_count = [0]
                 aug_ans = odeint(
                     augmented_dynamics, aug_y0,
-                    torch.tensor([t[i], t[i - 1]]), rtol=rtol, atol=atol, method=method, options=options
+                    torch.tensor([t[i], t[i - 1]]), rtol=rtol, atol=atol, method=method, options=options,
+                    step_count=step_count, fn_eval_count=fn_eval_count
                 )
+                print("BACKWARD\t"
+                      "Steps: {0:d}\t"
+                      "Fn Evals: {1:d}".format(step_count[0], fn_eval_count[0]))
 
                 # Unpack aug_ans.
                 adj_y = aug_ans[n_tensors:2 * n_tensors]
@@ -102,7 +114,7 @@ class OdeintAdjointMethod(torch.autograd.Function):
             return (*adj_y, None, time_vjps, adj_params, None, None, None, None, None)
 
 
-def odeint_adjoint(func, y0, t, rtol=1e-6, atol=1e-12, method=None, options=None):
+def odeint_adjoint(func, y0, t, rtol=1e-6, atol=1e-12, method=None, options=None, **kwargs):
 
     # We need this in order to access the variables inside this module,
     # since we have no other way of getting variables along the execution path.
@@ -126,7 +138,7 @@ def odeint_adjoint(func, y0, t, rtol=1e-6, atol=1e-12, method=None, options=None
         func = TupleFunc(func)
 
     flat_params = _flatten(func.parameters())
-    ys = OdeintAdjointMethod.apply(*y0, func, t, flat_params, rtol, atol, method, options)
+    ys = OdeintAdjointMethod.apply(*y0, func, t, flat_params, rtol, atol, method, options, **kwargs)
 
     if tensor_input:
         ys = ys[0]

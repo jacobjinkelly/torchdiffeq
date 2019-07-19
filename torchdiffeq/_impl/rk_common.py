@@ -19,7 +19,7 @@ class _RungeKuttaState(collections.namedtuple('_RungeKuttaState', 'y1, f1, t0, t
     """
 
 
-def _runge_kutta_step(func, y0, f0, t0, dt, tableau):
+def _runge_kutta_step(func, y0, f0, t0, dt, tableau, step_count=None, fn_eval_count=None):
     """Take an arbitrary Runge-Kutta step and estimate error.
 
     Args:
@@ -42,6 +42,9 @@ def _runge_kutta_step(func, y0, f0, t0, dt, tableau):
     dtype = y0[0].dtype
     device = y0[0].device
 
+    if step_count is not None:
+        step_count[0] += 1
+
     t0 = _convert_to_tensor(t0, dtype=dtype, device=device)
     dt = _convert_to_tensor(dt, dtype=dtype, device=device)
 
@@ -49,6 +52,8 @@ def _runge_kutta_step(func, y0, f0, t0, dt, tableau):
     for alpha_i, beta_i in zip(tableau.alpha, tableau.beta):
         ti = t0 + alpha_i * dt
         yi = tuple(y0_ + _scaled_dot_product(dt, beta_i, k_) for y0_, k_ in zip(y0, k))
+        if fn_eval_count is not None:
+            fn_eval_count[0] += 1
         tuple(k_.append(f_) for k_, f_ in zip(k, func(ti, yi)))
 
     if not (tableau.c_sol[-1] == 0 and tableau.c_sol[:-1] == tableau.beta[-1]):

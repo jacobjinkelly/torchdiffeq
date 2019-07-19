@@ -19,16 +19,16 @@ class AdaptiveStepsizeODESolver(object):
         pass
 
     @abc.abstractmethod
-    def advance(self, next_t):
+    def advance(self, next_t, **kwargs):
         raise NotImplementedError
 
-    def integrate(self, t):
+    def integrate(self, t, **kwargs):
         _assert_increasing(t)
         solution = [self.y0]
         t = t.to(self.y0[0].device, torch.float64)
         self.before_integrate(t)
         for i in range(1, len(t)):
-            y = self.advance(t[i])
+            y = self.advance(t[i], **kwargs)
             solution.append(y)
         return tuple(map(torch.stack, tuple(zip(*solution))))
 
