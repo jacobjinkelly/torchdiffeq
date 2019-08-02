@@ -153,8 +153,8 @@ def _compute_error_ratio(error_estimate, error_tol=None, rtol=None, atol=None, y
             for atol_, rtol_, y0_, y1_ in zip(atol, rtol, y0, y1)
         )
     error_ratio = tuple(error_estimate_ / error_tol_ for error_estimate_, error_tol_ in zip(error_estimate, error_tol))
-    mean_sq_error_ratio = tuple(torch.mean(error_ratio_ * error_ratio_) for error_ratio_ in error_ratio)
-    return mean_sq_error_ratio
+    max_sq_error_ratio = tuple(torch.max(error_ratio_ * error_ratio_) for error_ratio_ in error_ratio)
+    return max_sq_error_ratio
 
 
 def _optimal_step_size(last_step, mean_error_ratio, safety=0.9, ifactor=10.0, dfactor=0.2, order=5):
