@@ -108,6 +108,12 @@ class Dopri5Solver(AdaptiveStepsizeODESolver):
         mean_sq_error_ratio = _compute_error_ratio(y1_error, atol=self.atol, rtol=self.rtol, y0=y0, y1=y1)
         accept_step = (torch.tensor(mean_sq_error_ratio) <= 1).all()
 
+        # track when step is saved or rejected
+        if hasattr(self.func, 'base_func'):
+            self.func.base_func.reject.append((accept_step.item(), dt.item(), t0.item()))
+        else:
+            self.func.reject.append((accept_step.item(), dt.item(), t0.item()))
+
         ########################################################
         #                   Update RK State                    #
         ########################################################
